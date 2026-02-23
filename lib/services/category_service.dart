@@ -7,6 +7,7 @@ class CategoryService {
 
   /// تحميل التصنيفات من ملف JSON
   static Future<CategoryData> loadCategories() async {
+    //اذا  كانت البيانات موجودة رجعها
     if (_categoryData != null) return _categoryData!;
 
     final String jsonString = await rootBundle.loadString('assets/categories.json');

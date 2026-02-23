@@ -5,14 +5,17 @@ import 'package:flutter/foundation.dart';
 
 class GeminiService {
   // 🔑 هذا هو مفتاحك الجديد
-  final String _apiKey = 'AIzaSyDtGvqTUWMnC97CezIqh_TLlMjDLf0lheY';
+  final String _apiKey = 'AIzaSyA0mft4NoNHLb67FhFJifNbFabm7uzTipM';
 
-  Future<Map<String, dynamic>> processDocument(String imagePath) async {
+  Future<Map<String, dynamic>> processDocument(List<String> imagePaths) async {
     try {
-      debugPrint("📡 محاولة استخراج شاملة باستخدام الموديل: gemini-1.5-flash");
+      debugPrint(
+        "📡 محاولة استخراج شاملة لـ ${imagePaths.length} صور باستخدام الموديل: gemini-2.5-flash",
+      );
 
       final model = GenerativeModel(
         model: 'gemini-2.5-flash',
+
         apiKey: _apiKey,
         safetySettings: [
           SafetySetting(HarmCategory.harassment, HarmBlockThreshold.none),
@@ -21,17 +24,20 @@ class GeminiService {
           SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.none),
         ],
       );
-//قراءة الصورة
-      final imageBytes = await File(imagePath).readAsBytes();
-      
-      final prompt = [
-        Content.text("""
-        أنت نظام ذكاء اصطناعي متخصص في تحليل صور المستندات الرسمية وأنظمة الأرشفة الحكومية.
+
+      // تجهيز أجزاء الرسالة (نص + صور)
+      final parts = <Part>[];
+
+      // إضافة النص التوجيهي
+      parts.add(
+        TextPart("""
+               أنت نظام ذكاء اصطناعي متخصص في تحليل صور المستندات الرسمية وأنظمة الأرشفة الحكومية.
 
 مهمتك:
-تحليل صورة المستند المرفقة واستخراج بياناتها وتصنيفها بدقة ضمن نظام أرشفة يحتوي على 9 تصنيفات رئيسية، مع تصنيفات فرعية وتصنيفات ملفات وحقول ديناميكية.
-
-يوجد توافق تام بين التصنيفات والحقول المطلوبة وبين البيانات المستخرجة.
+تحليل **جميع الصور المرفقة** بدقة متناهية. الصور تمثل صفحات متعددة لنفس المستند الواحد.
+يجب عليك تجميع المعلومات من **كافة الصفحات** لملء الحقول المطلوبة.
+معلومة معينة قد تكون في الصفحة الأولى، ومعلومة أخرى في الصفحة الثانية أو الثالثة.
+⚠️ **تحذير: لا تكتفِ بتحليل الصورة الأولى فقط! ابحث في جميع الصور.**
 
 يجب أن يكون الإخراج بصيغة JSON فقط، بدون أي شرح أو نص إضافي.
 
@@ -46,130 +52,341 @@ class GeminiService {
 - إجراءات التوظيف
 - الشهادات العلمية
 - الأوراق الثبوتية والشخصية
+"));
+  
 
 ================================
 قواعد عامة:
-1. اختر mainCategory الأنسب حسب محتوى المستند.
-2. اختر subCategory ثم fileClass بناءً على القواعد أدناه.
-3. استخرج فقط الحقول المرتبطة بالتصنيف المختار.
-4. استخدم المفاتيح الإنجليزية (snake_case) لتتوافق مع النظام.
-5. إذا لم توجد قيمة لحقل، اكتب "غير متوفر".
+1. اقرأ جميع الصفحات لتحديد mainCategory الأنسب للمستند ككل.
+2. اختر subCategory ثم fileClass.
+3. ابحث عن قيم الحقول في **جميع الصفحات**.
+4. استخدم المفاتيح الإنجليزية (snake_case).
+5. إذا لم توجد قيمة لحقل في أي من الصفحات، اكتب "غير متوفر".
 6. التواريخ بصيغة YYYY/MM/DD إن أمكن.
 7. لا تختر قيم من خارج القوائم المحددة.
+8. لا تضف أي حقول غير معرفة في التصنيف المختار.
 
 ================================
 1️⃣ كشوفات ومراسلات وكتب
-subCategory: ثابت
-fileClass:
-- مراسلات داخلية → fields: correspondence_date, correspondence_title, correspondence_number
-- مراسلات خارجية → fields: correspondence_date, correspondence_title, correspondence_number
-- كتاب → fields: book_date, book_number, book_title
-- كشف → fields: statement_title, statement_number, statement_date
+subCategory: "كشوفات ومراسلات وكتب"
 
+fileClass:
+- مراسلات داخلية
+  fields: correspondence_date, correspondence_title, correspondence_number
+- مراسلات خارجية
+  fields: correspondence_date, correspondence_title, correspondence_number
+- كتاب
+  fields: book_date, book_number, book_title
+- كشف
+  fields: statement_title, statement_number, statement_date
+
+================================
 ================================
 2️⃣ التقييم
-subCategory:
-- كتاب شكر وتقدير
-- تقييم سنوي
-fileClass: نفس subCategory
+
+
+يتم الاختيار بناءً على نوع المستند:
+
+- كتاب شكر وتقدير:
+  subCategory: "كتاب شكر وتقدير"
+  fileClass: "كتاب شكر وتقدير"
+  fields: job_title(يظهر عادة تحت اسم الموظف), 
+  appreciation_level(التقيم بكون احيانا جيد جدا ممتاز جيد مقبول  وايضا احيانا ما بكون فى تقيم ف اترك الحقل فارغ فى هذه الحالة),
+   book_date, 
+  reason(استخرج سبب الكتاب من خلال قراءة الفقرة التي تلي اسم الموظف مباشرة:
+
+إذا وجدت كلمة "تقديرًا لـ" أو أي نص يصف عمل الموظف، انسخ الجملة كاملة كسبب.
+
+إذا وجدت ذكرًا لـ "تقييم سنوي" أو "أداء" فقط، ضع السبب "تقييم سنوي" دون أي شرح إضافي.
+
+لا تترك الحقل فارغًا إذا وجدت أي نص يصف عمل الموظف.)
+
+- تقييم سنوي:
+  subCategory: "تقييم سنوي"
+  fileClass: "تقييم سنوي"
+  fields: evaluation_year, annual_evaluation_result
+
+  تعليمات استخراج صارمة:
+
+  1- ابحث في الصفحة عن أي من الكلمات التالية:
+     "المجموع"
+     "المجموع الكلي"
+     "مجموع النقاط"
+     "النتيجة النهائية"
+
+  2- أي رقم موجود بجانب هذه الكلمات مباشرةً
+     اعتبره نتيجة التقييم السنوي
+     وضعه في الحقل:
+     annual_evaluation_result
+
+  3- أعد الرقم كما هو بدون تعديل.
+
+  4- لا تترك الحقل فارغاً إذا تم العثور على رقم بجانب إحدى هذه الكلمات.
+
+  5- إذا لم يتم العثور على أي من هذه الكلمات، اترك الحقل فارغاً.
 
 ================================
-3️⃣التصنيف الرئيسي: العقوبات
-التصنيف الفرعي: نوع العقوبة
-الحقل الثالث (fileClass) والحقول المرتبطة:
+3️⃣ العقوبات
 
-- تنبيه
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+قواعد خاصة بهذا القسم:
+- mainCategory: دائماً "العقوبات"
+- subCategory: دائماً "نوع العقوبة" (هذا هو المفتاح المعتمد في السيستم)
+- fileClass: يجب اختيار واحد من الخيارات المحددة أدناه فقط.
 
-- لفت نظر
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+قائمة تصنيفات الملفات (fileClass) والحقول الخاصة بكل منها:
 
-- إنذار بالفصل
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+1- تنبيه
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- إنذار نهائي بالفصل
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+2- لفت نظر
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- الحرمان من العلاوة الدورية
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+3- إنذار
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
+تعليمات:
+المسى الوظيفى فقط استخرج المسمى بدون تفاصيل مثلا مهندس أو مراقب 
+مدة البقاء على العقوبة  اذا وجدت اكتبها اذا لا اتركها فارغة وبالغلب ما بتكون متوفرة
 
-- الحرمان من الترقية
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+4- إنذار بالفصل
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- تخفيض الدرجة
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+5- إنذار نهائي بالفصل
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- خصم أيام بدون راتب
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+6- الحرمان من العلاوة الدورية
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- الوقوف عن العمل لمدة لا تتجاوز 6 أشهر
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration
+7- الحرمان من الترقية
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- الإحالة إلى المعاش
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration, retirementDate
+8- تخفيض الدرجة
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- إنهاء خدمة بسبب التغيب
-  fields: penaltyDate, jobTitle, penaltyReason, penaltyNumber, penaltyDuration, terminationDueToAbsenceDate
+9- خصم أيام بدون راتب
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
-- الفصل عن الخدمة
-  fields: penaltyDate, jobTitle, penaltyReason, terminationDate
+10- الوقوف عن العمل لمدة لا تتجاوز 6 أشهر
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration
 
+11- الإحالة إلى المعاش
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration, retirement_date
+
+12- إنهاء خدمة بسبب التغيب
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration, termination_date
+
+13- الفصل عن الخدمة
+fields: penalty_date, job_title, penalty_reason, penalty_number, penalty_duration, dismissal_date
+
+ملاحظة هامة: يجب التقيد بالمسميات أعلاه تماماً (خاصة الـ "ي" في نهاية الكلمات مثل "نهائي").
 ================================
+
 4️⃣ الملف الصحي
-subCategory:
-- إصابة عمل
-- قرار لجنة طبية
-fileClass:
-- إصابة عمل → تقرير تأمين صحي، تقرير طبي، إصابة عمل
-- قرار لجنة طبية → قرار لجنة طبية
+أريد استخراج البيانات من المستند الصحي وفق الهيكل التالي:
 
+1️⃣ التصنيف الرئيسي: اختر واحدة من التسع تصنيفات المتاحة في الملف الصحي.  
+
+2️⃣ التصنيف الفرعي: بناءً على التصنيف الرئيسي، اختر التصنيف الفرعي المناسب. الأمثلة الموجودة:
+   - "إصابة عمل"  
+   - "قرار القمسيون الطبي"
+
+3️⃣ تصنيف الملف (الحقل الثالث) وحقوله:
+
+   - إذا التصنيف الفرعي هو "إصابة عمل":  
+       - إذا اختر "تقرير تأمين صحي"، استخرج الحقول التالية:  
+           - "تقرير تأمين صحي"  
+       - إذا اختر "تقرير طبي"، استخرج الحقول التالية:  
+          
+           - "التشخيص الطبي"  
+           - "تاريخ المرض"  :(بكون موجود ب أعلى الصفحة)
+           ملاحظة احيانا التاريخ بكون يالعربى
+           -  توصية الطبيب :نوصي بإجازة مرضية لمدة مثلا يومين  اعتباراً من 2019/4/15".
+           تعليمات 
+           ونوصى باجازة مرضية لمن الاقى هادا الحقل بدى اركز اش كاتب الطبيب فيه
+           - "اسم المستشفى"  :(بكون بالختم مذكور واحيانا بالصفحة من فوق او من تحت)
+
+            ⚠️ تعليمات مهمة:
+         - لا تخمن أي معلومة.
+         - لا تستنتج.
+         - استخرج فقط ما هو مكتوب حرفياً في النص.
+
+
+
+
+       - إذا كان الملف نفسه "إصابة عمل"، استخرج الحقول التالية:  
+           - "نوع الإصابة"  
+           - "تاريخ الإصابة"  
+           - "نسبة العجز"
+إذا التصنيف الفرعي هو "قرار القمسيون الطبي":
+  - اجعل تصنيف الملف: "قرار قمسيون طبي"
+
+1. منطق الذاكرة التراكمية (ممنوع الحذف):
+تعامل مع الصور كأجزاء مكملة لملف واحد.
+
+قاعدة الدمج: بمجرد استخراج معلومة (مثل الاسم أو التاريخ)، يجب أن تظل في الـ JSON حتى لو أرسلت لك أوراقاً لاحقة لا تحتوي عليها.
+
+تعبئة الفراغات: استخدم الأوراق المتأخرة لتعبئة أي حقل كان فارغاً في الأوراق الأولى.
+
+2. قاعدة الحسم (لائق للعمل):
+الأولوية القصوى: القرار النهائي (لائق/غير لائق) يلغي أي نتائج فحوصات فرعية.
+
+إذا وجدت كلمة "لائق":
+
+disease_name: "لائق للعمل" (ممنوع كتابة أي مرض فرعي مثل 'القرن العيني').
+
+disease_type: "لائق للعمل".
+
+disability_percentage: اتركه فارغاً "".
+
+ملاحظة: قياسات النظر (6/6، 6/9) ليست مرضاً، لا تستخرجها كمرض طالما القرار النهائي "لائق".
+في حالة وجود مرض أو عجز (غير لائق أو لائق مع عجز):
+
+disease_name: استخرج التشخيص الطبي الدقيق والنهائي المكتوب في خانة "التشخيص" أو "القرار" (مثال: انزلاق غضروفي، إصابة عمل باليد اليمنى، إلخ).
+
+disease_type: حدد نوع المرض من سياق التقرير (مثال: "مرض مزمن"، "إصابة عمل"، "عجز دائم"). ممنوع كتابة "غير متوفر" إذا كان هناك مرض مذكور.
+
+disability_percentage: ابحث عن رقم نسبة العجز المئوية (مثال: 15%، 20%).
+
+إذا وجد الرقم: استخرجه كقيمة نصية (مثلاً: "20%").
+
+إذا لم يوجد رقم صريح: اترك الحقل فارغاً "".
+
+
+3. التواريخ والأسماء البرمجية (للتوافق مع التطبيق):
+disease_date: استخرج تاريخ القرار (غالباً في الصفحة 1 أو 2).
+
+التنسيق: YYYY-MM-DD حصراً.
+
+الثبات: لا تحذف التاريخ أبداً بعد العثور عليه.
+
+commission_approved_duration: استخرج المدة المعتمدة إذا وجدت، وإلا اتركها فارغة "".
 ================================
 5️⃣ القرارات والأوامر الإدارية
+
 subCategory:
 - قرارات اللجان
 - أمر إداري
 - قرار رئيس البلدية
 
 قرارات اللجان → fileClass:
-- مكاتبات → document_title, document_date, entity
-- قرارات → decision_title, decision_number, decision_date, decision_year,
-job_title, department, section, grade_allowance
-- لجنة مؤقتة → committee_formation_number, decision_year, committee_tasks,
-committee_date, committee_title, membership_type
+- مكاتبات
+  fields: document_title, document_date, entity
 
-أمر إداري → fileClass:
+- قرارات
+  fields: decision_title, decision_number, decision_date, decision_year,
+          job_title, department, section, grade_allowance
+
+- لجنة مؤقتة
+- لجنة دائمة
+
+(لجنة مؤقتة ولجنة دائمة تستخدم نفس الحقول):
+fields:
+- committee_formation_number
+- decision_year
+- committee_tasks
+- committee_date
+- committee_title
+- membership_type
+
+أمر إداري:
+fileClass:
 - أمر إداري
-- تكليف موظف
-- إنهاء انتداب موظف
-- انتداب
-- نقل موظف
-- نقل متقاعد
+(لا يتم إظهار أي حقول)
 
-fields حسب النوع وتشمل:
-order_number, order_year, job_title, department, section, unit, 
-order_title, assignment_start_date, assignment_end_date, work_start_date
+قرار رئيس البلدية:
+اذا التصنيف الفرعى فرار رئيس البلدية اذن تصنيف الملف قرار رئيس البلدية
+fields:
+-decision_number
+-decision_title
+-job_title
+-grade
+-decision_date
+-decision_year
+-grade_allowance
 
 ================================
 6️⃣ السيرة الذاتية
 subCategory:
-سيرة ذاتية، عقد عمل، شهادة عضوية، شهادة خبرة،
-شهادة تدريب، شهادة مدرب
+- سيرة ذاتية
+- عقد عمل
+- شهادة عضوية
+- شهادة خبرة
+- شهادة تدريب
+- شهادة مدرب
 
-سيرة ذاتية → كشوفات / سيرة ذاتية
-fields: document_title, document_date
+سيرة ذاتية:
+fileSubClass:سيرة ذاتية
+fileClass: سيرة ذاتية
+(لا يتم إظهار أي حقول)
+تعليمات
+أي وثيقة تحتوي على ملخص لمسيرة الموظف، تاريخ تعيينه، تقييمه السنوي، وتدرجه الوظيفي، تُصنف كـ 'سيرة ذاتية / بيان حالة وظيفية'، حتى لو كانت مروسة بـ 'إدارة شئون الموظفين'.
 
-عقد عمل → fields:
-job_title, contract_end_date, specialization, institution, document_date
+لا تصنفها كـ 'مراسلة داخلية' لمجرد وجود توقيع وتاريخ، بل انظر للمحتوى الأساسي وهو سجل الموظف."
 
-شهادة عضوية → membership_number, union_name
+الحالة الثانية اذا كان 
+fileSubClass:سيرة ذاتية
+fileClass:كشوفات
+هنا يتم اظهار حقلين عنوان الوثيقة و تاريخ الوثيقة
+تعليمات
+اذا كان المستند عبارة عن نموذج مطبوع(Form)
+يحتوى على خانات مجدولة مثل(الراتب الاجمالى-البدلات-العلاوات)
+ونرويسة رسمية من ادارة الموظفين فيجب اعتباره كشوفات
 
-شهادة خبرة → job_title, work_start_date, institution_name,
-work_field, work_end_date
 
-شهادة تدريب → training_institution, course_hours, course_specialization, 
-course_type, course_name, course_date, accreditation_type
 
-شهادة مدرب → course_name, course_date
+عقد عمل:
+اذا كان التصنيف الفرعى عقد عمل اذن تصنيق الملف عقد عمل
+fields:
+- job_title
+- contract_end_date
+- specialization
+- institution
+- document_date
+
+شهادة عضوية:
+اذا كان التصنيف الفرعى شهادة عضويةاذن تصنيف الملف شهادة عضوية النقابات المهنية
+fields:
+- membership_number
+- union_name
+اسم النقابة (union_name): 1. ابحث عن اسم الجهة المصدرة للشهادة.
+2. استخرج الاسم كاملاً كما هو موجود في القوائم (مثلاً: "نقابة المحاسبين" أو "نقابة المهندسين").
+3. يجب أن يتطابق النص تماماً مع الخيارات المتاحة في القائمة المنسدلة.
+4. إذا كان النص "نقابة المحاسبين الفلسطينية"، النتيجة المطلوبة هي: نقابة المحاسبين.
+
+شهادة خبرة:
+اذا كان التصنيف الفرعى شهادة خبرة اذن تصنيف الملف شهادة خبرة
+التصنيف الفرعي "شهادة خبرة" هو مستند رسمي يحتوي على:
+- جهة عمل رسمية
+- اسم موظف
+- مسمى وظيفي
+- تاريخ بدء عمل أو مدة خدمة
+- صيغة مثل "تشهد بأن" أو "يعمل لدينا"
+- توقيع أو ختم رسمي
+fields:
+- job_title:: (استخرج الكلمة الوظيفية الأساسية فقط التي تسبق حرف الجر (مثل: مهندس ,مراقب
+- work_start_date:
+- institution_name
+- work_field:استخرج العبارة الكاملة التي تصف القسم أو طبيعة العمل (مثل: مراقب بقسم الإشراف) ليعطي سياقاً كاملاً عن مكان الوظيفة.
+
+- work_end_date:ملاحظة فى حالة ما كان موجود ادخل التاريخ الموجود أعلى الصفحة
+
+شهادة تدريب:
+اذ كان التصنيف الفرعى شهادة تدريب اذن تصنيف الملف شهادة دورة تدريبية
+fields:
+- training_institution
+- course_hours
+- course_specialization
+- course_type
+- course_name
+- course_date:بناخد تاريخ بداية الدورة 
+
+-accreditation_type: اذهب مباشرة إلى الختم الرسمي الموجود في أسفل الشهادة. استخرج اسم الجهة المذكورة داخل الختم الدائري أو المربع (مثل: ديوان الموظفين العام، وزارة التربية والتعليم، نقابة المهندسين). هذا الحقل يمثل الجهة التي تمنح الصفة الرسمية للوثيقة.
+
+ملاحظة اسم الدورة ونوع الدورة وتخصص الدورة نفس بعض بندخلهم
+
+شهادة مدرب:
+fields:
+- course_name
+- course_date
 
 ================================
 7️⃣ إجراءات التوظيف
@@ -178,33 +395,117 @@ subCategory:
 - عملية التعاقد
 
 عملية التثبيت → fileClass:
-تثبيت موظفين، توصية بشأن مستخدم في الخدمة ببلدية غزة، أوراق ما قبل التثبيت
-fields: document_date
+- تثبيت موظفين
+- توصية بشأن مستخدم في الخدمة ببلدية غزة
+- أوراق ما قبل التثبيت
+fields:
+- document_date
 
 عملية التعاقد → fileClass:
-عقد العمل → contract_type, salary, contract_start_date, contract_end_date
-توصيات لجنة المقابلة للعمل → document_date
-نتائج المقابلات → minutes_date, job_title, percentage, ranking
-نتائج امتحان المتقدمين → document_date
-قرار → decision_date
-إعلان وظيفة → announcement_type, announcement_end_date, department,
-announcement_date, job_title
+عقد العمل:
+fields:
+- contract_type
+- salary
+- contract_start_date
+- contract_end_date
+
+توصيات لجنة المقابلة للعمل:
+fields:
+- document_date
+
+نتائج المقابلات:
+fields:
+- minutes_date
+- job_title
+- percentage
+- ranking
+
+نتائج امتحان المتقدمين:
+fields:
+- document_date
+
+قرار:
+fields:
+- decision_date
+
+إعلان وظيفة:
+fields:
+- announcement_type
+- announcement_end_date
+- department
+- announcement_date
+- job_title
 
 ================================
 8️⃣ الشهادات العلمية
 subCategory:
 - شهادة توجيهي
 - شهادة جامعية
+تعليمات:اذا كان التصنيف الفرعى شهادة جامعية بكون تصنيف الملف شهادة جامعية
+اما اذا كان التصنيف الفرع شهادة توجيهى تصنيف الملف شهادة توجيهى
+شهادة توجيهي:
+fields:
+- certificate_date
+- average:
+ ابحث عن الكلمات التالية:
+- المعدل
+- المعدل العام
+- المجموع
+- مجموع الدرجات
+- المجموع الكلي
+- المجموع المئوي
+-مجموع الدرجات بالحروف
 
-شهادة توجيهي → fields:
-certificate_date, average, city, country, graduation_year,
-branch, has_high_certification
+استخرج الرقم أو النص الذي يأتي مباشرة بعد هذه الكلمات.
 
-شهادة جامعية → fields:
-qualification, university_name, degree,
-graduation_year, major, country, city,
-grade, minor
+إذا كان مكتوبًا بالأرقام مثل:
+90.7
+88%
+650
 
+أعده كما هو.
+
+إذا كان مكتوبًا بالحروف مثل:
+مائة وأربعون درجة
+خمسمائة وستون
+
+أعد النص كما هو بدون تعديل.
+
+
+
+- city:
+
+- country
+- graduation_year
+- branch:بالنسبة للفرع بكون مذكور كلمة الفرع او صف
+- has_high_certification:تصديق عالي: ابحث عن أي أختام إضافية لوزارة التعليم العالي أو الخارجية (مثل الختم الموجود في أعلى يمين ويسار الورقةاو اسفل الورق بكون احيانا موجود الختم). إذا وجدتها أجب بـ 'نعم'، وإذا لم توجد أجب بـ 'لا'.
+ملاحظة بالنسبة للاختام حتى لو كانت اختام محلية اعتبرها تصديق عالي
+تعليمات :اذا وجدت ورقة فى جدول مواد دراسية مثلا تاريخ جغرافيا كيمياء فيزباء 
+تصنف شهادة توجيهى
+
+
+شهادة جامعية:
+fields:
+- qualification:
+تعليمات:القاعدة: استخرج "الدرجة العلمية" متبوعة بـ "نوع التخصص العام" فقط، مع حذف التفاصيل الفرعية أو الدقيقة.
+طريقة الصياغة: (المستوى الأكاديمي) + (التخصص العام).
+أمثلة توضيحية :
+
+إذا كان النص "بكالوريوس هندسة معمارية" ← يكتب: بكالوريوس هندسة.
+
+إذا كان النص "دبلوم متوسط سكرتارية طبية" ← يكتب: دبلوم سكرتارية.
+
+إذا كان النص "ماجستير إدارة أعمال دولية" ← يكتب: ماجستير إدارة.
+- university_name
+- degree:ممكن تكون(بكالوريس -دبلوم-ماجستر -دكتوراة)
+- graduation_year
+- major
+- country:اذا وجدت الجامعة الاسلامية-جامعة الاقصى-جامعة الازهر-الكلية الجتمعية للعلوم التطبقية:  الدولة بتكون فلسطين غير هيك راح يتم ذكر الدولة
+- city
+- grade:يكتب كرقم ويتم الحصول عليه من كشق الدرجات بكون مكتوب المعدل التراكمى بتم اخذ اخر معدل تراكى للشخص واعتماده كتقدير
+تعليمات التقدير استخرج الرقم الصحيح وتجاهل ما بعد الفاصلة
+مثال: إذا كان المعدل التراكمي الأخير هو 90.86 أو 90.1 ← النتيجة المستخرجة تكون 90 فقط.
+- minor :بكون التخصص الفرعى نفس التخصص العام 
 ================================
 9️⃣ الأوراق الثبوتية والشخصية
 subCategory:
@@ -212,38 +513,312 @@ subCategory:
 - شخصي
 
 عائلي → fileClass:
-شهادة وفاة → death_date, deceased_id, relationship
-تعديل حالة اجتماعية → id_number, relationship, date, name
-شهادة قيد جامعة → document_date, child_id, child_name,
-university_name, academic_year, country
-شهادات ميلاد الأبناء → child_id, relationship, child_birth_date
+شهادة وفاة:
+fields:
+- death_date
+- deceased_id
+- deceased_name
+- relationship
+
+تعديل حالة اجتماعية:
+fields: 
+- id_number:
+- relationship:
+- date:
+- name:
+🟢 المرحلة 1: تحليل الملف الرئيسي
+
+1️⃣ اقرأ الملف الرئيسي فقط.
+2️⃣ تأكد أن الطلب هو: "تعديل حالة اجتماعية".
+3️⃣ حدد نوع الشخص من النص (زوجة / ابن / ابنة / إقرار/نفس الموظف).
+
+🟢 المرحلة 2: تحديد الملف الثانوي
+
+بناءً على relationship:
+
+إذا = زوجة → استخدم ملف عقد الزواج.
+
+إذا = ابن أو ابنة → استخدم شهادة الميلاد.
+
+إذا = إقرار → استخدم نفس الورقة.
+
+🟢 المرحلة 3: استخراج البيانات
+في حالة الزوجة:
+
+استخرج فقط:
+
+اسم الزوجة:
+رقم هوية الزوجة:
+
+تعليمات استخراج اسم وهوية الزوجة:
+في عقد الزواج يوجد جدول في الجزء العلوي يحتوي على صفّين متتاليين.
+
+الصف الأول يحتوي على بيانات الزوج — تجاهله بالكامل.
+
+الصف الثاني مباشرة تحته يحتوي على بيانات الزوجة.
+
+1️⃣"للوصول لاسم الزوجة الصحيح، اتبع الإشارات التالية في وثيقة عقد الزواج:
+
+تخطي السطر الأول: تجاهل السطر الذي يبدأ بكلمة 'الزوج' تماماً.
+نقطة الارتكاز: ابدأ القراءة من السطر الثاني الذي يبدأ بكلمة 'الزوجة بكر/ثيب'.
+
+النص المستهدف: الاسم يقع مباشرة بعد كلمة 'الزوجة'
+فى حالة لم يكن اسم الزوجة واضح بالعقد او لم تستطع قراءته ارجع الى ملف هوية الزوج واستخرج الاسم 
+
+2️⃣للوصول الى رقم الهوية
+افحص رقم هوية الزوجة في العقد:
+
+إذا واضح وكامل → استخدمه مباشرة.
+
+إذا غير واضح أو ناقص → اذهب إلى ملف هوية الزوج → استخدم الرقم الموجود هناك كمرجع بديل.
+ايضا فى عقود قديمة  رقم الهوية بحتوى على رمز
+إذا احتوى الرقم على رموز مثل "/" أو مسافات،
+قم بحذف أي رمز غير رقمي واحتفظ بالأرقام فقط.
+يجب أن تكون النتيجة النهائية مكونة من 9 أرقام.
+
+
+قم أولاً بتصحيح اتجاه الصورة وجعل النص أفقيًا قبل التحليل.
+
+
+تجاهل باقي البيانات.
+
+relationship = "زوجة"
+
+date = تاريخ المستند من الملف الرئيسي فقط
+
+فى حالة الاقرار
+استخرج البيانات من الورقة نفسها  رقم هوية الموظف
+صلة  القرابة نفس الموظف
+التاريخ بكون اعلى المسند
+الاسم بكون اسم الموظف
+
+
+في حالة الابن / الابنة:
+
+استخرج:
+
+الاسم الكامل
+
+رقم الهوية
+
+relationship = "ابن" أو "ابنة"
+
+date = من الملف الرئيسي
+في حالة الإقرار:
+
+استخرج البيانات مباشرة من نفس الورقة.
+
+relationship حسب النص.
+
+date من نفس الورقة.
+التسلسل الإجباري:
+
+1. حلل الملف الرئيسي فقط لتحديد نوع العلاقة.
+2. بعد تحديد العلاقة، انتقل إلى الملف الثانوي المناسب.
+3. لا تستخرج أي بيانات من الملف الرئيسي باستثناء التاريخ.
+4. استخرج الحقول المطلوبة فقط من الملف الثانوي.
+5. إذا لم يتطابق نوع العلاقة مع أي وثيقة مرفقة، أرجع خطأ: "الوثيقة المناسبة غير موجودة".
+
+الملف الرئيسي هو المرفق الأول.
+الملف الثانوي هو المرفق الثاني.
+يجب عدم استخدام الملف الثانوي قبل تحديد العلاقة من الملف الرئيسي.
+
+
+شهادة قيد جامعة:
+
+fields:
+- document_date
+- child_id
+- child_name
+- university_name
+- academic_year
+- country
+تعليمات 
+رقم هوية الابن غير موجودة بشهادة القيد  سوف نستخرجها من هوية الاب
+اتجه الى ملف هوية الاب واستخرج رقم هوية الابن المذكور بشهادة القيد
+
+شهادات ميلاد الأبناء:
+fields:
+- child_id
+- relationship
+- child_birth_date
+
+
+
 
 شخصي → fileClass:
-عقد الإيجار → tenant_name, city, neighborhood, contract_type,
-rental_period, rental_start_date, rental_end_date,
-building_number, street_number, rental_amount
+1-فاتورة المياه
+accountNumber
+subscriber_name
+beneficiaryName
+street_number
+buildingNumber
+unit_number
+اذا احتوى المستند على العناصر التالية يصنف فاتورة المياه
+- اسم بلدية أو جهة خدمات
+- رقم حساب
+- رقم فاتورة
+- قراءة سابقة وقراءة حالية
+- كمية استهلاك
+- إجمالي المبلغ
+- آخر موعد للدفع
+وجود "القراءة السابقة" و"القراءة الحالية" معًا
+هو مؤشر قوي على أنها فاتورة مياه.
+إذا وُجد اسم واحد فقط في الفاتورة
+يتم تخزينه في subscriberName
+ويُنسخ نفس الاسم في beneficiary_name
 
-جواز سفر → employee_id, passport_number
-فاتورة مياه → account_number, subscriber_name, beneficiary_name,
-street_number, building_number, unit_number
-إقرار تغيير عنوان السكن → governorate, neighborhood, street_name,
-building_number, street_number, nearest_landmark
-عنوان السكن → city, neighborhood, street_name,
-building_number, street_number, nearest_landmark
-أمر بالإفراج → document_date, release_date, detention_period
-شهادة حسن سير وسلوك → issue_date
-شهادة عدم محكومية → issue_date, expiry_date
-شهادة طلاق → wife_name, wife_id, divorce_date
-بيانات البنك → account_number, bank_name, iban
-رخصة قيادة → license_number, issue_date, expiry_date
-بطاقة عضوية نقابة → union_name, membership_number, issue_date
-عقد زواج → wife_name, wife_id, marriage_date,
-husband_id, husband_name, relationship
-شهادة ميلاد → document_date
-صورة الهوية → employee_id, employee_full_name,
-wife_full_name, wife_id, children_count,
-id_issue_date
+إذا وُجد الاسمان وكانا متطابقين
+يتم تخزينهما كما هما
 
+إذا وُجد الاسمان وكانا مختلفين
+يتم حفظ كل اسم في حقله الصحيح دون دمج
+
+2-عقد الزواج
+إذا المستند يحتوي على أي من الكلمات أو العبارات:
+- "عقد زواج"
+- "تم الزواج بين"
+- "الزوج/الزوجة"
+- "تاريخ الزواج"
+- "وثيقة عقد الزواج"
+→ صنف المستند كـ "وثيقة شخصية: عقد زواج"
+
+
+wife_name: اسم الزوجة كما هو مذكور في العقد، إذا غير واضح اترك الحقل فارغ
+wifeId: رقم هوية الزوجة كما هو مذكور في العقد، إذا غير واضح اتركه فارغ.
+marriage_date:ابحث عن أول تاريخ مذكور في أعلى الوثيقة بعد عنوان المستند ("وثيقة عقد زواج") أو بعد رقم الوثيقة.
+husband_id:رقم هوية الزوج كما هو مذكور في العقد، إذا غير واضح اتركه فارغ.
+husband_name:اسم الزوج كما هو مذكور في العقد، إذا غير واضح اتركه فارغ.
+relationship:زوجة
+### 3. حالات عدم الوضوح:
+1. إذا كان اسم الزوجة أو الزوج أو رقم هويتهم غير واضح في العقد:
+   → توجه مباشرة لملف هوية الزوج للتحقق.
+2. عند استخراج اسم الزوجة من هوية الزوج:
+   → خذ الاسم **كما هو موجود** (مثال: "سارة").
+   → لا تضف أي جزء من الاسم من مصادر أخرى.
+   → لا تحاول إكمال الاسم إذا كان ناقصًا.
+3. إذا لم يكن الاسم واضح بالكامل حتى بعد الرجوع للهوية:
+   → اترك الحقل فارغ أو ضع ملاحظة "تأكد من الملف الرسمي".
+4. نفس القاعدة تنطبق على أي بيانات شخصية أخرى غير واضحة (مثل رقم الهوية).
+
+"تنبيه أمني: يُمنع استخدام أي معلومات من خارج هذه الصورة. إذا لم تجد الاسم مكتوباً بوضوح (حرفياً) في الورقة، يجب أن تكتب 'غير متوفر' ولا تقم باقتراح أي أسماء من عندك مهما كان السبب."
+
+
+3-شهادة حسن سير وسلوك
+اذا كان عنوان الورقة شهادة حسن السيرة والسلوك وخلو من السوابق تصنف شهادة حسن سير وسلوك
+issueDate
+
+4-رخصة القيادة
+إذا احتوى المستند على:
+- رقم رخصة
+- تاريخ إصدار
+- تاريخ انتهاء
+- صورة شخصية
+-نوع الرخصة
+فصنّف المستند: رخصة قيادة
+license_number
+licenseIssueDate:: 
+license_expiry_date:
+
+5-شهادة الميلاد
+اذا كان عنوان الورقة شهادة ميلاد او شهادة ولادة 
+إذا المستند يحتوي على:
+- "اسم الطفل" و"تاريخ الميلاد" → صنف كـ شهادة ميلاد الابناء
+- "اسم الأب" و"تاريخ الميلاد" و"رقم الهوية" بدون ذكر الطفل → صنف كـ شهادة ميلاد
+document_date
+
+6-بطاقة عضوية النقابة
+union_name: استخرج الاسم كاملاً كما هو موجود في القوائم (مثلاً: "نقابة المحاسبين" أو "نقابة المهندسين"). يجب أن يتطابق النص تماماً مع الخيارات المتاحة في القائمة المنسدلة.
+membership_number:استخرج الرقم المكتوب في أقصى يسار البطاقة تحت عبارة (رقم العضوية) مباشرة.
+issue_date:
+في هذا النوع من المستندات، تاريخ الإصدار يكون داخل الختم الرسمي.
+ .ابحث بصريًا داخل منطقة الختم الدائري
+استخرج أي تاريخ يظهر داخل الختم بصيغة أرقام (مثل 12/03/2022 أو 2022-03-12).
+7-صورة الهوية
+إذا احتوى المستند على:
+- صورة شخصية
+- رقم هوية
+- اسم رباعي
+- تاريخ ميلاد
+- بيانات حامل البطاقة
+
+→ صنف المستند "صورة الهوية
+وجود جدول الأبناء أو كلمة "الأولاد" لا يغير التصنيف.
+employee_id
+employee_full_name
+wife_full_name
+wife_id
+children_count
+id_issue_date:ابحث عن التاريخ المكتوب في أقصى الزاوية السفلى اليسرى، مباشرة تحت صورة الشخص.
+child1_id
+child1_name
+child1_birth_date
+child1_gender
+child2_id
+child2_name
+child2_birth_date
+child2_gender
+child3_id
+child3_name
+child3_birth_date
+child3_gender
+child4_id
+child4_name
+child4_birth_date
+child4_gender
+child5_id
+child5_name
+child5_birth_date
+child5_gender
+قواعد استخراج بيانات "بطاقة الهوية الفلسطينية" بشكل دقيق:
+1️⃣ استخراج بيانات صاحب البطاقة
+
+- employee_full_name: الاسم الكامل رباعي (الاسم الشخصي + الأب + الجد + العائلة)
+  - ابحث عن أول سطر بعد رقم الهوية مباشرة.
+  - إذا أي جزء مفقود، ضع null.
+- employee_id: أي تسلسل أرقام 7-10 أرقام يعتبر رقم الهوية.
+- idIssueDate: ابحث عن التاريخ المكتوب في أقصى الزاوية السفلى اليسرى تحت صورة الشخص.
+- إذا أي حقل غير واضح، ضع null.
+
+أعد النتيجة بصيغة JSON:
+{
+  "employee_full_name": "...",
+  "employee_id": "...",
+  "id_issue_date": "..."
+}
+2️⃣ استخراج بيانات الزوجة
+1️⃣ wifeFullName:  
+- الاسم كما هو مكتوب في البطاقة تحت حقل "اسم الزوجة".  
+- إذا لم يذكر اسم العائلة، استخدم نفس اسم عائلة الزوج.  
+- لا تخمن أي أسماء غير موجودة، وإذا غير واضح ضع null.
+
+2️⃣ wifeId:  
+- الرقم الموجود بجانب اسم الزوجة إذا موجود.  
+- إذا غير واضح أو غير موجود ضع null.
+3️⃣ استخراج بيانات الأبناء
+
+- فقط الأبناء الموجودين في الجدول.
+- رتبهم حسب تاريخ الميلاد من الأقدم للأصغر.
+- إذا الأبناء أقل من 5، ضع باقي الحقول null.
+- لكل طفل:
+  - childX_name
+  - childX_birth_date
+  - childX_gender
+  - childX_id
+
+- children_count: عدد الأبناء الفعلي.
+
+أعد النتيجة بصيغة JSON:
+{
+  "children_count": ...,
+  "child1_name": "...", "child1_birth_date": "...", "child1_gender": "...", "child1_id": "...",
+  "child2_name": "...", ...
+}
+- ضع كل الحقول غير الموجودة null.
+
+8-شهادة عدم محكومية
+issue_date
+expiry_date
 ================================
 إخراج JSON فقط بالشكل التالي:
 {
@@ -251,24 +826,31 @@ id_issue_date
   "subCategory": "",
   "fileClass": "",
   "fields": {
-    "field_id": "value"
+    "field_name": "value"
   }
 }
+      """),
+      );
 
-        """),
-        Content.data('image/jpeg', imageBytes),
-      ];
-//ارسال طلب النموذج
-      final response = await model.generateContent(prompt);
+      // إضافة صور المستند
+      for (var path in imagePaths) {
+        final imageBytes = await File(path).readAsBytes();
+        parts.add(DataPart('image/jpeg', imageBytes));
+      }
+
+      // إرسال الطلب (User Message واحدة تحتوي على النص والصور)
+      final content = Content.multi(parts);
+      final response = await model.generateContent([content]);
+
       final responseText = response.text;
-      
+
       debugPrint("📄 Raw AI Response: $responseText");
-//التأكد من وجود جسون فى النص
+      //التأكد من وجود جسون فى النص
       if (responseText != null && responseText.contains('{')) {
         int start = responseText.indexOf('{');
         int end = responseText.lastIndexOf('}') + 1;
         String jsonString = responseText.substring(start, end);
-        
+
         final Map<String, dynamic> data = jsonDecode(jsonString);
 
         return {
@@ -278,8 +860,10 @@ id_issue_date
           'fields': data['fields'] ?? {},
         };
       }
-      
-      throw Exception("لم يتم العثور على بيانات JSON في استجابة الذكاء الاصطناعي.");
+
+      throw Exception(
+        "لم يتم العثور على بيانات JSON في استجابة الذكاء الاصطناعي.",
+      );
     } catch (e) {
       debugPrint("⛔ GeminiService Error: $e");
       rethrow; // نترك الواجهة تتعامل مع الخطأ لإظهار السناك بار الصحيح
@@ -308,9 +892,11 @@ id_issue_date
       final imageBytes = await File(imagePath).readAsBytes();
 
       // بناء قائمة الحقول المطلوبة
-      final fieldDescriptions = fields.map((field) {
-        return '- ${field.id}: ${field.label} (نوع: ${field.type})';
-      }).join('\n');
+      final fieldDescriptions = fields
+          .map((field) {
+            return '- ${field.id}: ${field.label} (نوع: ${field.type})';
+          })
+          .join('\n');
 
       final prompt = [
         Content.text("""

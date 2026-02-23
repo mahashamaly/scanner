@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/category_model.dart';
 import '../services/category_service.dart';
 import '../services/gemini_service.dart';
+import '../widgets/image_capture_section.dart';
+import '../widgets/category_selection_section.dart';
+import '../widgets/dynamic_form_section.dart';
 
 class DynamicArchivePage extends StatefulWidget {
   const DynamicArchivePage({super.key});
@@ -29,8 +31,8 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
   List<DynamicField> dynamicFields = [];
   Map<String, TextEditingController> fieldControllers = {};
 
-  // الصورة المختارة
-  File? selectedImage;
+  // الصور المختارة
+  List<File> selectedImages = [];
   bool isProcessing = false;
 
   @override
@@ -101,7 +103,9 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
   Future<void> _onFileClassificationChanged(String? value) async {
     if (value == null ||
         selectedMainCategory == null ||
-        selectedSubCategory == null) return;
+        selectedSubCategory == null) {
+      return;
+    }
 
     setState(() {
       selectedFileClassification = value;
@@ -139,52 +143,78 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
 
     if (pickedFile != null) {
       setState(() {
-        selectedImage = File(pickedFile.path);
-        isProcessing = true;
+        selectedImages.add(File(pickedFile.path));
       });
-
-      // تحليل الصورة تلقائياً
-      await _analyzeImageAndPopulateFields();
     }
   }
 
-  /// البحث عن أقرب تطابق في قائمة
+  /// حذف صورة
+  void _removeImage(int index) {
+    setState(() {
+      selectedImages.removeAt(index);
+    });
+  }
+
+  /// البحث عن أقرب تطابق في قائمة مع مراعاة خصائص اللغة العربية
   String? _findBestMatch(String searchTerm, List<String> options) {
     if (searchTerm.isEmpty || options.isEmpty) return null;
-    
-    // البحث عن تطابق دقيق أولاً
-    if (options.contains(searchTerm)) return searchTerm;
-    
-    // البحث عن تطابق جزئي
+
+    // دالة لتنظيف النص العربي وتوحيده
+    String normalize(String text) {
+      return text
+          .replaceAll('ال', '') // إزالة ال التعريف
+          .replaceAll('أ', 'ا') // توحيد الألف
+          .replaceAll('إ', 'ا')
+          .replaceAll('آ', 'ا')
+          .replaceAll('ة', 'ه') // توحيد التاء المربوطة والهاء
+          .replaceAll('ى', 'ي') // توحيد الياء والألف المقصورة
+          .replaceAll(RegExp(r'\s+'), '') // إزالة المسافات
+          .trim();
+    }
+
+    final normalizedSearch = normalize(searchTerm);
+
+    // 1. البحث عن تطابق دقيق أولاً
     for (var option in options) {
-      if (option.contains(searchTerm) || searchTerm.contains(option)) {
-        debugPrint("🔍 تم العثور على تطابق: '$searchTerm' ≈ '$option'");
+      if (option.trim() == searchTerm.trim()) return option;
+    }
+
+    // 2. البحث عن تطابق بعد التوحيد 
+    for (var option in options) {
+      if (normalize(option) == normalizedSearch) {
+        debugPrint("🔍 تطابق بعد التوحيد: '$searchTerm' ≈ '$option'");
         return option;
       }
     }
-    
-    // البحث عن تطابق بعد إزالة "ال" التعريف
-    final cleanSearch = searchTerm.replaceAll('ال', '').trim();
+
+    // 3. البحث عن تطابق جزئي بعد التوحيد
     for (var option in options) {
-      final cleanOption = option.replaceAll('ال', '').trim();
-      if (cleanOption.contains(cleanSearch) || cleanSearch.contains(cleanOption)) {
-        debugPrint("🔍 تم العثور على تطابق بعد التنظيف: '$searchTerm' ≈ '$option'");
+      final normalizedOption = normalize(option);
+      if (normalizedOption.contains(normalizedSearch) ||
+          normalizedSearch.contains(normalizedOption)) {
+        debugPrint("🔍 تطابق جزئي بعد التوحيد: '$searchTerm' ≈ '$option'");
         return option;
       }
     }
-    
+
     return null;
   }
 
   /// تحليل الصورة وتحديد التصنيفات والحقول تلقائياً
   Future<void> _analyzeImageAndPopulateFields() async {
-    if (selectedImage == null) return;
+    if (selectedImages.isEmpty) return;
+
+    setState(() {
+      isProcessing = true;
+    });
 
     try {
       final geminiService = GeminiService();
       
-      // استخراج البيانات الأولية من الصورة
-      final extractedData = await geminiService.processDocument(selectedImage!.path);
+      // استخراج البيانات الأولية من الصور
+      final extractedData = await geminiService.processDocument(
+        selectedImages.map((e) => e.path).toList(),
+      );
       
       debugPrint("📊 البيانات المستخرجة: $extractedData");
 
@@ -227,9 +257,11 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
             setState(() {
               final fields = extractedData['fields'] as Map<String, dynamic>? ?? {};
               for (var entry in fields.entries) {
-                if (fieldControllers.containsKey(entry.key)) {
+                if (fieldControllers.containsKey(entry.key) && fieldControllers[entry.key] != null) {
                   fieldControllers[entry.key]!.text = entry.value.toString();
                   debugPrint("✏️ تم ملء الحقل '${entry.key}' بالقيمة '${entry.value}'");
+                } else {
+                  debugPrint("⚠️ الحقل '${entry.key}' غير موجود في النماذج الحالية، تم تخطيه.");
                 }
               }
             });
@@ -282,10 +314,15 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
     }
   }
 
-  /// معالجة الصورة وملء الحقول (تم الاستغناء عنها - الآن يتم التحليل تلقائياً)
-  Future<void> _processImage() async {
-    // هذه الدالة لم تعد مستخدمة
-    // التحليل يتم تلقائياً في _analyzeImageAndPopulateFields
+  /// زر الحفظ
+  void _onSave() {
+    // هنا يمكن إضافة منطق الحفظ
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('💾 تم حفظ البيانات بنجاح'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   @override
@@ -310,467 +347,43 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // قسم اختيار الصورة (أولاً)
-            _buildImageSection(),
+            // قسم اختيار الصورة
+            // قسم اختيار الصورة
+            ImageCaptureSection(
+              selectedImages: selectedImages,
+              isProcessing: isProcessing,
+              onImagePicked: _pickImage,
+              onImageRemoved: _removeImage,
+              onStartScan: _analyzeImageAndPopulateFields,
+            ),
             const SizedBox(height: 32),
 
-            // قسم التصنيفات (يظهر بعد تحليل الصورة)
+            // قسم التصنيفات
             if (selectedMainCategory != null) ...[
-              _buildCategorySection(),
+              CategorySelectionSection(
+                selectedMainCategory: selectedMainCategory,
+                selectedSubCategory: selectedSubCategory,
+                selectedFileClassification: selectedFileClassification,
+                mainCategories: mainCategories,
+                subCategories: subCategories,
+                fileClassifications: fileClassifications,
+                onMainCategoryChanged: _onMainCategoryChanged,
+                onSubCategoryChanged: _onSubCategoryChanged,
+                onFileClassificationChanged: _onFileClassificationChanged,
+              ),
               const SizedBox(height: 32),
             ],
 
-            // قسم الحقول الديناميكية (يظهر بعد تحديد التصنيفات)
+            // قسم الحقول الديناميكية
             if (dynamicFields.isNotEmpty) ...[
-              _buildDynamicFieldsSection(),
+              DynamicFormSection(
+                fields: dynamicFields,
+                controllers: fieldControllers,
+                onSave: _onSave,
+              ),
               const SizedBox(height: 32),
             ],
-
-            // زر الحفظ
-            if (dynamicFields.isNotEmpty) _buildSaveButton(),
           ],
-        ),
-      ),
-    );
-  }
-
-  /// قسم اختيار التصنيفات
-  Widget _buildCategorySection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '📂 اختر نوع المستند',
-            style: GoogleFonts.cairo(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // التصنيف الرئيسي
-          _buildDropdown(
-            label: 'التصنيف الرئيسي',
-            value: selectedMainCategory,
-            items: mainCategories,
-            onChanged: _onMainCategoryChanged,
-          ),
-          const SizedBox(height: 16),
-
-          // التصنيف الفرعي
-          if (subCategories.isNotEmpty)
-            _buildDropdown(
-              label: 'التصنيف الفرعي',
-              value: selectedSubCategory,
-              items: subCategories,
-              onChanged: _onSubCategoryChanged,
-            ),
-          const SizedBox(height: 16),
-
-          // تصنيف الملف
-          if (fileClassifications.isNotEmpty)
-            _buildDropdown(
-              label: 'تصنيف الملف',
-              value: selectedFileClassification,
-              items: fileClassifications,
-              onChanged: _onFileClassificationChanged,
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// بناء قائمة منسدلة
-  Widget _buildDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.cairo(
-            fontSize: 14,
-            color: Colors.white70,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF111328),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white24),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: value,
-              isExpanded: true,
-              dropdownColor: const Color(0xFF111328),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              hint: Text(
-                'اختر $label',
-                style: GoogleFonts.cairo(color: Colors.white38),
-              ),
-              items: items.map((item) {
-                return DropdownMenuItem(
-                  value: item,
-                  child: Text(
-                    item,
-                    style: GoogleFonts.cairo(color: Colors.white),
-                  ),
-                );
-              }).toList(),
-              onChanged: onChanged,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// قسم اختيار الصورة
-  Widget _buildImageSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // العنوان
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.camera_alt, color: Color(0xFFEB1555), size: 28),
-              const SizedBox(width: 12),
-              Text(
-                'ابدأ بتصوير أو اختيار المستند',
-                style: GoogleFonts.cairo(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'سيتم تحليل المستند تلقائياً وملء الحقول',
-            style: GoogleFonts.cairo(
-              fontSize: 14,
-              color: Colors.white60,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-
-          // عرض الصورة المختارة
-          if (selectedImage != null)
-            Container(
-              height: 250,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEB1555), width: 2),
-                image: DecorationImage(
-                  image: FileImage(selectedImage!),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-
-          // أزرار اختيار الصورة
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () => _pickImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt, size: 24),
-                  label: Text(
-                    'الكاميرا',
-                    style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEB1555),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () => _pickImage(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library, size: 24),
-                  label: Text(
-                    'المعرض',
-                    style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4C4F5E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // مؤشر التحميل
-          if (isProcessing)
-            Padding(
-              padding: const EdgeInsets.only(top: 24),
-              child: Column(
-                children: [
-                  const CircularProgressIndicator(
-                    color: Color(0xFFEB1555),
-                    strokeWidth: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '🤖 جاري تحليل المستند بالذكاء الاصطناعي...',
-                    style: GoogleFonts.cairo(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// قسم الحقول الديناميكية
-  Widget _buildDynamicFieldsSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '📝 بيانات المستند',
-            style: GoogleFonts.cairo(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // عرض الحقول الديناميكية
-          ...dynamicFields.map((field) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _buildDynamicField(field),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  /// بناء حقل ديناميكي
-  Widget _buildDynamicField(DynamicField field) {
-    if (field.type == 'dropdown' && field.options != null) {
-      return _buildDynamicDropdown(field);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              field.label,
-              style: GoogleFonts.cairo(
-                fontSize: 14,
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (field.required)
-              const Text(
-                ' *',
-                style: TextStyle(color: Colors.red),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: fieldControllers[field.id],
-          style: GoogleFonts.cairo(color: Colors.white),
-          keyboardType: field.type == 'date'
-              ? TextInputType.datetime
-              : TextInputType.text,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFF111328),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white24),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white24),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEB1555), width: 2),
-            ),
-            hintText: 'أدخل ${field.label}',
-            hintStyle: GoogleFonts.cairo(color: Colors.white38),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// بناء قائمة منسدلة ديناميكية
-  Widget _buildDynamicDropdown(DynamicField field) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              field.label,
-              style: GoogleFonts.cairo(
-                fontSize: 14,
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (field.required)
-              const Text(
-                ' *',
-                style: TextStyle(color: Colors.red),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF111328),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white24),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: fieldControllers[field.id]!.text.isEmpty
-                  ? null
-                  : fieldControllers[field.id]!.text,
-              isExpanded: true,
-              dropdownColor: const Color(0xFF111328),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              hint: Text(
-                'اختر ${field.label}',
-                style: GoogleFonts.cairo(color: Colors.white38),
-              ),
-              items: field.options!.map((option) {
-                return DropdownMenuItem(
-                  value: option,
-                  child: Text(
-                    option,
-                    style: GoogleFonts.cairo(color: Colors.white),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  fieldControllers[field.id]!.text = value ?? '';
-                });
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// زر الحفظ
-  Widget _buildSaveButton() {
-    return ElevatedButton(
-      onPressed: () {
-        // هنا يمكن إضافة منطق الحفظ
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('💾 تم حفظ البيانات بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFEB1555),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: Text(
-        '💾 حفظ البيانات',
-        style: GoogleFonts.cairo(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
         ),
       ),
     );

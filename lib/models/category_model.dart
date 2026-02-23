@@ -5,9 +5,9 @@ class CategoryData {
 
   factory CategoryData.fromJson(Map<String, dynamic> json) {
     return CategoryData(
-      categories: (json['categories'] as List)
-          .map((e) => MainCategory.fromJson(e))
-          .toList(),
+      categories: (json['categories'] as List?)
+          ?.map((e) => MainCategory.fromJson(e))
+          .toList() ?? [],
     );
   }
 }
@@ -27,9 +27,9 @@ class MainCategory {
     return MainCategory(
       id: json['id'],
       mainCategory: json['mainCategory'],
-      subCategories: (json['subCategories'] as List)
-          .map((e) => SubCategory.fromJson(e))
-          .toList(),
+      subCategories: (json['subCategories'] as List?)
+          ?.map((e) => SubCategory.fromJson(e))
+          .toList() ?? [],
     );
   }
 }
@@ -49,9 +49,9 @@ class SubCategory {
     return SubCategory(
       id: json['id'],
       name: json['name'],
-      fileClassifications: (json['fileClassifications'] as List)
-          .map((e) => FileClassification.fromJson(e))
-          .toList(),
+      fileClassifications: (json['fileClassifications'] as List?)
+          ?.map((e) => FileClassification.fromJson(e))
+          .toList() ?? [],
     );
   }
 }
@@ -71,9 +71,9 @@ class FileClassification {
     return FileClassification(
       id: json['id'],
       name: json['name'],
-      fields: (json['fields'] as List)
-          .map((e) => DynamicField.fromJson(e))
-          .toList(),
+      fields: (json['fields'] as List?)
+          ?.map((e) => DynamicField.fromJson(e))
+          .toList() ?? [],
     );
   }
 }
