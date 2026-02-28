@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/category_model.dart';
 import '../services/category_service.dart';
 import '../services/gemini_service.dart';
@@ -31,6 +32,8 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
   List<DynamicField> dynamicFields = [];
   Map<String, TextEditingController> fieldControllers = {};
 
+  final TextEditingController targetEmployeeController = TextEditingController();
+
   // الصور المختارة
   List<File> selectedImages = [];
   bool isProcessing = false;
@@ -47,6 +50,7 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
     for (var controller in fieldControllers.values) {
       controller.dispose();
     }
+    targetEmployeeController.dispose();
     super.dispose();
   }
 
@@ -148,9 +152,23 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
     }
   }
 
-  /// حذف صورة
+  /// اختيار ملف PDF
+  Future<void> _pickDocument() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        selectedImages.add(File(result.files.single.path!));
+      });
+    }
+  }
+
+  /// حذف صورة أو ملف
   void _removeImage(int index) {
-    setState(() {
+      setState(() {
       selectedImages.removeAt(index);
     });
   }
@@ -214,6 +232,9 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
       // استخراج البيانات الأولية من الصور
       final extractedData = await geminiService.processDocument(
         selectedImages.map((e) => e.path).toList(),
+        targetEmployeeId: targetEmployeeController.text.trim().isNotEmpty 
+            ? targetEmployeeController.text.trim() 
+            : null,
       );
       
       debugPrint("📊 البيانات المستخرجة: $extractedData");
@@ -347,15 +368,37 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // قسم اختيار الصورة
-            // قسم اختيار الصورة
+            // قسم اختيار الصورة والملف
             ImageCaptureSection(
               selectedImages: selectedImages,
               isProcessing: isProcessing,
               onImagePicked: _pickImage,
+              onDocumentPicked: _pickDocument,
               onImageRemoved: _removeImage,
               onStartScan: _analyzeImageAndPopulateFields,
             ),
+            const SizedBox(height: 16),
+            
+            // حقل إدخال الموظف المستهدف (لو كان المستند يحتوي على عدة موظفين)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D1E33),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: TextField(
+                controller: targetEmployeeController,
+                style: GoogleFonts.cairo(color: Colors.white),
+                decoration: InputDecoration(
+                  icon: const Icon(Icons.person_search, color: Color(0xFFEB1555)),
+                  hintText: 'لاستخراج بيانات موظف محدد، اكتب رقم هويته أو اسمه هنا',
+                  hintStyle: GoogleFonts.cairo(color: Colors.white54, fontSize: 13),
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+            
             const SizedBox(height: 32),
 
             // قسم التصنيفات

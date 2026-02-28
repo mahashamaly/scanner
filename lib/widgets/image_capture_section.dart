@@ -7,6 +7,7 @@ class ImageCaptureSection extends StatefulWidget {
   final List<File> selectedImages;
   final bool isProcessing;
   final Function(ImageSource) onImagePicked;
+  final VoidCallback onDocumentPicked;
   final Function(int) onImageRemoved;
   final VoidCallback? onStartScan;
 
@@ -15,6 +16,7 @@ class ImageCaptureSection extends StatefulWidget {
     required this.selectedImages,
     required this.isProcessing,
     required this.onImagePicked,
+    required this.onDocumentPicked,
     required this.onImageRemoved,
     this.onStartScan,
   });
@@ -109,19 +111,39 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                 controller: _pageController,
                 itemCount: widget.selectedImages.length,
                 itemBuilder: (context, index) {
+                  final isPdf = widget.selectedImages[index].path.toLowerCase().endsWith('.pdf');
                   return Stack(
                     alignment: Alignment.center,
                     children: [
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
+                          color: isPdf ? const Color(0xFF2C2D43) : null,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFEB1555), width: 2),
-                          image: DecorationImage(
+                          image: isPdf ? null : DecorationImage(
                             image: FileImage(widget.selectedImages[index]),
                             fit: BoxFit.cover,
                           ),
                         ),
+                        child: isPdf
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.picture_as_pdf, size: 64, color: Colors.white),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      widget.selectedImages[index].path.split('/').last.split('\\').last,
+                                      style: GoogleFonts.cairo(color: Colors.white, fontSize: 14),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : null,
                       ),
                       // زر حذف الصورة
                       if (!widget.isProcessing)
@@ -177,42 +199,66 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                   onPressed: widget.isProcessing
                       ? null
                       : () => widget.onImagePicked(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt, size: 24),
+                  icon: const Icon(Icons.camera_alt, size: 20),
                   label: Text(
-                    widget.selectedImages.isEmpty ? 'تصوير مستند' : 'إضافة صفحة',
+                    'كاميرا',
                     style: GoogleFonts.cairo(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEB1555),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: widget.isProcessing
                       ? null
                       : () => widget.onImagePicked(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library, size: 24),
+                  icon: const Icon(Icons.photo_library, size: 20),
                   label: Text(
-                    widget.selectedImages.isEmpty ? 'من المعرض' : 'إضافة من المعرض',
+                    'معرض',
                     style: GoogleFonts.cairo(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4C4F5E),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: widget.isProcessing
+                      ? null
+                      : widget.onDocumentPicked,
+                  icon: const Icon(Icons.picture_as_pdf, size: 20),
+                  label: Text(
+                    'PDF',
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0288D1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
