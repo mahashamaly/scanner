@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class CategorySelectionSection extends StatelessWidget {
+  //القيم المختارة حاليا فى القوائم المنسدلة
   final String? selectedMainCategory;
   final String? selectedSubCategory;
   final String? selectedFileClassification;
+  //القوائم التي ستظهر في Dropdown لكل تصنيف.
   final List<String> mainCategories;
   final List<String> subCategories;
   final List<String> fileClassifications;
+  //Callbacks تُستدعى عند تغيير المستخدم للاختيار.
   final Function(String?) onMainCategoryChanged;
   final Function(String?) onSubCategoryChanged;
   final Function(String?) onFileClassificationChanged;
@@ -30,15 +33,16 @@ class CategorySelectionSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
+        border: Border.all(color: Colors.black12, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,7 +52,7 @@ class CategorySelectionSection extends StatelessWidget {
             style: GoogleFonts.cairo(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.black87,
             ),
           ),
           const SizedBox(height: 20),
@@ -99,34 +103,34 @@ class CategorySelectionSection extends StatelessWidget {
           label,
           style: GoogleFonts.cairo(
             fontSize: 14,
-            color: Colors.white70,
+            color: Colors.black54,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF111328),
+            color: const Color(0xFFF8F9FA), 
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white24),
+            border: Border.all(color: Colors.black12),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              dropdownColor: const Color(0xFF111328),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+              dropdownColor: Colors.white,
+              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0096D6)),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               hint: Text(
                 'اختر $label',
-                style: GoogleFonts.cairo(color: Colors.white38),
+                style: GoogleFonts.cairo(color: Colors.black38),
               ),
               items: items.map((item) {
                 return DropdownMenuItem(
                   value: item,
                   child: Text(
                     item,
-                    style: GoogleFonts.cairo(color: Colors.white),
+                    style: GoogleFonts.cairo(color: Colors.black87),
                   ),
                 );
               }).toList(),

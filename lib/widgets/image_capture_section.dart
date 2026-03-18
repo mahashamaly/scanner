@@ -1,15 +1,17 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io' as io; // استخدام alias للمنصات الأخرى
 
 class ImageCaptureSection extends StatefulWidget {
-  final List<File> selectedImages;
+  final List<XFile> selectedImages;
   final bool isProcessing;
   final Function(ImageSource) onImagePicked;
   final VoidCallback onDocumentPicked;
   final Function(int) onImageRemoved;
   final VoidCallback? onStartScan;
+  final bool miniMode;
 
   const ImageCaptureSection({
     super.key,
@@ -19,6 +21,7 @@ class ImageCaptureSection extends StatefulWidget {
     required this.onDocumentPicked,
     required this.onImageRemoved,
     this.onStartScan,
+    this.miniMode = false,
   });
 
   @override
@@ -38,7 +41,6 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
   void didUpdateWidget(ImageCaptureSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedImages.length > oldWidget.selectedImages.length) {
-      // تم إضافة صورة جديدة، انتقل إليها
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pageController.hasClients) {
           _pageController.animateToPage(
@@ -57,141 +59,155 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
     super.dispose();
   }
 
+  ImageProvider _getImageProvider(XFile file) {
+    if (kIsWeb) {
+      return NetworkImage(file.path);
+    } else {
+      return FileImage(io.File(file.path));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: widget.miniMode ? const EdgeInsets.all(12) : const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
+        border: Border.all(color: Colors.black12, width: 1),
       ),
       child: Column(
         children: [
-          // العنوان
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.camera_alt, color: Color(0xFFEB1555), size: 28),
-              const SizedBox(width: 12),
-              Text(
-                'صور المستند',
-                style: GoogleFonts.cairo(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          if (!widget.miniMode) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.camera_alt, color: Color(0xFF0096D6), size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'صور المستند',
+                  style: GoogleFonts.cairo(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'يمكنك إضافة عدة صفحات للمستند الواحد',
-            style: GoogleFonts.cairo(
-              fontSize: 14,
-              color: Colors.white60,
+              ],
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            Text(
+              'يمكنك إضافة عدة صفحات للمستند الواحد',
+              style: GoogleFonts.cairo(
+                fontSize: 14,
+                color: Colors.black54,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+          ],
 
-          // عرض الصور المختارة
-          if (widget.selectedImages.isNotEmpty)
-            Container(
-              height: 300,
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 20),
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: widget.selectedImages.length,
-                itemBuilder: (context, index) {
-                  final isPdf = widget.selectedImages[index].path.toLowerCase().endsWith('.pdf');
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          color: isPdf ? const Color(0xFF2C2D43) : null,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFEB1555), width: 2),
-                          image: isPdf ? null : DecorationImage(
-                            image: FileImage(widget.selectedImages[index]),
-                            fit: BoxFit.cover,
+          Container(
+            height: widget.miniMode ? 550 : 420,
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 20),
+            child: Column(
+              children: [
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: (index) => setState(() {}),
+                    itemCount: widget.selectedImages.length,
+                    itemBuilder: (context, index) {
+                      final isPdf = widget.selectedImages[index].path.toLowerCase().endsWith('.pdf');
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isPdf ? const Color(0xFFF0F2F5) : Colors.black,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF0096D6), width: 2),
+                              image: isPdf ? null : DecorationImage(
+                                image: _getImageProvider(widget.selectedImages[index]),
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            child: isPdf ? const Center(child: Icon(Icons.picture_as_pdf, size: 60, color: Colors.red)) : null,
                           ),
-                        ),
-                        child: isPdf
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.picture_as_pdf, size: 64, color: Colors.white),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      widget.selectedImages[index].path.split('/').last.split('\\').last,
-                                      style: GoogleFonts.cairo(color: Colors.white, fontSize: 14),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : null,
-                      ),
-                      // زر حذف الصورة
-                      if (!widget.isProcessing)
-                        Positioned(
-                          top: 10,
-                          left: 10,
-                          child: GestureDetector(
-                            onTap: () => widget.onImageRemoved(index),
+                          if (!widget.isProcessing)
+                            Positioned(
+                              top: 10, left: 10,
+                              child: IconButton(
+                                icon: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.close, color: Colors.white, size: 18)),
+                                onPressed: () => widget.onImageRemoved(index),
+                              ),
+                            ),
+                           Positioned(
+                            bottom: 12, right: 12,
                             child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                              child: Text('صفحة ${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                
+                if (widget.selectedImages.length > 1)
+                  Container(
+                    height: 80,
+                    margin: const EdgeInsets.only(top: 15),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: widget.selectedImages.length,
+                      itemBuilder: (context, index) {
+                        bool isActive = false;
+                        if (_pageController.hasClients) {
+                          isActive = _pageController.page?.round() == index;
+                        } else {
+                          isActive = index == 0;
+                        }
+                        
+                        return GestureDetector(
+                          onTap: () => _pageController.animateToPage(
+                            index,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          ),
+                          child: Container(
+                            width: 60,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isActive ? const Color(0xFF0096D6) : Colors.transparent,
+                                width: 2.5,
                               ),
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                                size: 20,
+                              image: DecorationImage(
+                                image: _getImageProvider(widget.selectedImages[index]),
+                                fit: BoxFit.cover,
                               ),
                             ),
                           ),
-                        ),
-                      // رقم الصفحة
-                      Positioned(
-                        bottom: 10,
-                        right: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'صفحة ${index + 1} من ${widget.selectedImages.length}',
-                            style: GoogleFonts.cairo(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
+          ),
 
-          // أزرار اختيار الصورة (أو إضافة المزيد)
           Row(
             children: [
               Expanded(
@@ -208,7 +224,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEB1555),
+                    backgroundColor: const Color(0xFF0096D6),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -232,7 +248,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4C4F5E),
+                    backgroundColor: const Color(0xFF607D8B),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -256,7 +272,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0288D1),
+                    backgroundColor: const Color(0xFF673AB7),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -268,7 +284,6 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
             ],
           ),
           
-          // زر بدء المسح الذكي
           if (widget.selectedImages.isNotEmpty && !widget.isProcessing)
             Padding(
               padding: const EdgeInsets.only(top: 16),
@@ -285,7 +300,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00C853), // لون أخضر مميز للتحليل
+                    backgroundColor: const Color(0xFF00C853),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     shape: RoundedRectangleBorder(
@@ -298,7 +313,6 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
               ),
             ),
 
-          // مؤشر التحميل
           if (widget.isProcessing)
             Padding(
               padding: const EdgeInsets.only(top: 24),
@@ -312,7 +326,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                   Text(
                     '🤖 جاري تحليل المستند المكون من ${widget.selectedImages.length} صفحات...',
                     style: GoogleFonts.cairo(
-                      color: Colors.white70,
+                      color: Colors.black54,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),

@@ -5,12 +5,14 @@ import '../models/category_model.dart'; // Make sure path is correct relative to
 class DynamicFormSection extends StatefulWidget {
   final List<DynamicField> fields;
   final Map<String, TextEditingController> controllers;
+  final String buttonLabel; // مسمى الزر المتغير
   final VoidCallback onSave;
 
   const DynamicFormSection({
     super.key,
     required this.fields,
     required this.controllers,
+    required this.buttonLabel,
     required this.onSave,
   });
 
@@ -24,25 +26,26 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1E33),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
+        border: Border.all(color: Colors.black12, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '📝 بيانات المستند',
+            '📝 بيانات المستند المستخرجة',
             style: GoogleFonts.cairo(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.black87,
             ),
           ),
           const SizedBox(height: 20),
@@ -60,21 +63,22 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
           // زر الحفظ
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
               onPressed: widget.onSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEB1555),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                '💾 حفظ البيانات',
+              icon: const Icon(Icons.save, size: 24),
+              label: Text(
+                widget.buttonLabel,
                 style: GoogleFonts.cairo(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00C853), 
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
@@ -99,7 +103,7 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
               field.label,
               style: GoogleFonts.cairo(
                 fontSize: 14,
-                color: Colors.white70,
+                color: Colors.black54,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -113,27 +117,27 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
         const SizedBox(height: 8),
         TextField(
           controller: widget.controllers[field.id],
-          style: GoogleFonts.cairo(color: Colors.white),
+          style: GoogleFonts.cairo(color: Colors.black87),
           keyboardType: field.type == 'date'
               ? TextInputType.datetime
               : TextInputType.text,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFF111328),
+            fillColor: const Color(0xFFF8F9FA),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white24),
+              borderSide: const BorderSide(color: Colors.black12),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white24),
+              borderSide: const BorderSide(color: Colors.black12),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEB1555), width: 2),
+              borderSide: const BorderSide(color: Color(0xFF0096D6), width: 2),
             ),
             hintText: 'أدخل ${field.label}',
-            hintStyle: GoogleFonts.cairo(color: Colors.white38),
+            hintStyle: GoogleFonts.cairo(color: Colors.black26),
           ),
         ),
       ],
@@ -151,7 +155,7 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
               field.label,
               style: GoogleFonts.cairo(
                 fontSize: 14,
-                color: Colors.white70,
+                color: Colors.black54,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -165,9 +169,9 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF111328),
+            color: const Color(0xFFF8F9FA),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white24),
+            border: Border.all(color: Colors.black12),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -176,19 +180,19 @@ class _DynamicFormSectionState extends State<DynamicFormSection> {
                   ? widget.controllers[field.id]!.text
                   : null,
               isExpanded: true,
-              dropdownColor: const Color(0xFF111328),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+              dropdownColor: Colors.white,
+              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0096D6)),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               hint: Text(
                 'اختر ${field.label}',
-                style: GoogleFonts.cairo(color: Colors.white38),
+                style: GoogleFonts.cairo(color: Colors.black26),
               ),
               items: field.options!.map((option) {
                 return DropdownMenuItem(
                   value: option,
                   child: Text(
                     option,
-                    style: GoogleFonts.cairo(color: Colors.white),
+                    style: GoogleFonts.cairo(color: Colors.black87),
                   ),
                 );
               }).toList(),
