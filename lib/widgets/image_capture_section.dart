@@ -142,6 +142,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                             ),
                             child: isPdf ? const Center(child: Icon(Icons.picture_as_pdf, size: 60, color: Colors.red)) : null,
                           ),
+                          //زر حذف الصورة
                           if (!widget.isProcessing)
                             Positioned(
                               top: 10, left: 10,
@@ -154,6 +155,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                             bottom: 12, right: 12,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        
                               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
                               child: Text('صفحة ${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 11)),
                             ),
@@ -163,7 +165,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                     },
                   ),
                 ),
-                
+                //هذا الجزء يعرض الصور المصغرة اسفل البيج فيو
                 if (widget.selectedImages.length > 1)
                   Container(
                     height: 80,
@@ -283,7 +285,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
               ),
             ],
           ),
-          
+          //زر بدء المسح الذكي
           if (widget.selectedImages.isNotEmpty && !widget.isProcessing)
             Padding(
               padding: const EdgeInsets.only(top: 16),
@@ -312,7 +314,7 @@ class _ImageCaptureSectionState extends State<ImageCaptureSection> {
                 ),
               ),
             ),
-
+       //عرض مؤشر التحميل أثناء المعالجة
           if (widget.isProcessing)
             Padding(
               padding: const EdgeInsets.only(top: 24),

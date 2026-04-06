@@ -7,7 +7,8 @@ import 'package:file_picker/file_picker.dart';
 
 import '../models/category_model.dart';
 import '../services/category_service.dart';
-import '../services/gemini_service.dart';
+import '../services/ai_factory.dart';
+import '../services/ai_service.dart';
 import '../widgets/image_capture_section.dart';
 import '../widgets/category_selection_section.dart';
 import '../widgets/dynamic_form_section.dart';
@@ -16,6 +17,7 @@ import '../services/database_service.dart';
 import 'package:uuid/uuid.dart';
 import '../services/employee_service.dart';
 import 'employee_file_page.dart';
+import 'ai_analytics_page.dart';
 
 class DynamicArchivePage extends StatefulWidget {
   final ProcessedDocument? document;
@@ -74,6 +76,7 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
   }
 
   Future<void> _initializeForEditing() async {
+    //أخذ المستند الذى أرسل للصفحة
     final doc = widget.document!;
     //تعبئة البيانات الاساسية
     if (mounted) {
@@ -101,7 +104,6 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
           fileClassifications = files;
           selectedFileClassification = doc.fileClassification;
         });
-
         if (doc.fileClassification != null) {
           final fields = await CategoryService.getFields(
             doc.mainCategory!,
@@ -110,6 +112,7 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
           );
           if (!mounted) return;
           setState(() {
+            //خزنا الحقول
             dynamicFields = fields;
             for (var field in fields) {
               final controller = TextEditingController(
@@ -125,6 +128,7 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
     // ✅ مهم جداً: تحميل بيانات الموظف المرتبط بهذا المستند
     final empName = doc.fieldValues['employee_name'];
     final empId = doc.fieldValues['employee_id'];
+    //التأكد من وجود اسم الموظف:
     if (empName != null) {
       setState(() {
         targetEmployeeController.text = empName;
@@ -263,7 +267,7 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
         maxHeight: 1800,
         imageQuality: 85,
       );
-
+//التحقق إذا المستخدم اختار صورة
       if (pickedFile != null) {
         setState(() {
           selectedImages.add(pickedFile);
@@ -359,10 +363,8 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
     });
 //إنشاء كائن الخدمة وتحليل الصور
     try {
-      final geminiService = GeminiService();
-      
-      // استخراج البيانات الأولية من الصور
-      final extractedData = await geminiService.processDocument(
+      // 🚀 هنا نستخدم "المدير الذكي المطوّر" الذي يوجه الصور للوكيل المناسب مع نظام طوارئ!
+      final extractedData = await AIFactory.executeWithFallback(
         selectedImages.map((e) => e.path).toList(),
         targetEmployeeId: targetEmployeeController.text.trim().isNotEmpty 
             ? targetEmployeeController.text.trim() 
@@ -570,6 +572,17 @@ class _DynamicArchivePageState extends State<DynamicArchivePage> {
         centerTitle: true,
       ),
       body: isDesktop ? _buildSplitLayout() : _buildMobileLayout(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => AIAnalyticsPage()),
+          );
+        },
+        backgroundColor: const Color(0xFF0096D6),
+        label: Text('المحلل الذكي', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+        icon: const Icon(Icons.analytics, color: Colors.white),
+      ),
     );
   }
 
@@ -757,12 +770,13 @@ Widget _buildTargetEmployeeField() {
         displayStringForOption: (Employee option) => option.name,
         optionsBuilder: (TextEditingValue textEditingValue) {
           if (textEditingValue.text.isEmpty) {
-            return const Iterable<Employee>.empty();
+            return const Iterable<Employee>.empty();//اذا الحقل فارغ لا تظهر الاقتراحات
           }
           return EmployeeService.searchEmployees(textEditingValue.text);
         },
         onSelected: (Employee selection) {
           setState(() {
+            //حفظ الموظف المختار
             selectedEmployee = selection;
             // تحديث النص يدوياً لضمان الظهور الفوري في البوكس
             targetEmployeeController.text = selection.name;

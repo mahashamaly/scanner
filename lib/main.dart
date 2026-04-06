@@ -7,9 +7,9 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // تهيئة قاعدة البيانات لمنصة ويندوز/ديسك توب
-  if (defaultTargetPlatform == TargetPlatform.windows || 
+  if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || 
       defaultTargetPlatform == TargetPlatform.linux || 
-      defaultTargetPlatform == TargetPlatform.macOS) {
+      defaultTargetPlatform == TargetPlatform.macOS)) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }

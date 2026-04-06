@@ -47,7 +47,7 @@ class ProcessedDocument {
       status: map['status'] ?? 'pending',
     );
   }
-
+//يحول Object إلى نص JSON جاهز للإرسال أو التخزين.
   String toJson() => json.encode(toMap());
 
   factory ProcessedDocument.fromJson(String source) =>

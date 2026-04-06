@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart';
 import '../models/processed_document.dart';
 
@@ -16,17 +18,28 @@ class DatabaseService {
   }
 
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    if (kIsWeb) {
+      return await databaseFactoryFfiWeb.openDatabase(
+        filePath,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: _createDB,
+        ),
+      );
+    } else {
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, filePath);
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
+      return await openDatabase(
+        path,
+        version: 1,
+        onCreate: _createDB,
+      );
+    }
   }
 
   Future _createDB(Database db, int version) async {
+    //لتسهيل إعادة الاستخدام والتعديل لاحقًا.
     const idType = 'TEXT PRIMARY KEY';
     const textType = 'TEXT NOT NULL';
     const textTypeNull = 'TEXT';
@@ -65,6 +78,7 @@ CREATE TABLE documents (
       final map = Map<String, dynamic>.from(jsonMap);
       map['imagePaths'] = json.decode(map['imagePaths'] as String).cast<String>();
       map['fieldValues'] = Map<String, String>.from(json.decode(map['fieldValues'] as String));
+     //تحويل الماب ل اوبجكت
       return ProcessedDocument.fromMap(map);
     }).toList();
   }
